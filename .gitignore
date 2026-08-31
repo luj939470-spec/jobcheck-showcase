@@ -1,0 +1,52 @@
+# Environment files and secrets
+.env
+.env.*
+!.env.example
+**/.env
+**/.env.*
+!**/.env.example
+
+# Dependencies and package-manager caches
+node_modules/
+**/node_modules/
+.pnpm-store/
+**/.pnpm-store/
+
+# Build, test and framework output
+dist/
+**/dist/
+build/
+**/build/
+coverage/
+**/coverage/
+.vite/
+**/.vite/
+.vite-temp/
+**/.vite-temp/
+
+# Runtime data and local databases
+.runtime/
+**/.runtime/
+*.db
+*.sqlite
+*.sqlite3
+*.dump
+*.backup
+
+# Logs, temporary files and editor settings
+*.log
+*.pid
+*.tmp
+*.temp
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# Local verification and delivery folders
+.deployment-check/
+.showcase/
+delivered/
+
+# Original design archive is not required to run the application
+JobCheck Mobile App Design System.zip

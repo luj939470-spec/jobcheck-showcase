@@ -1,0 +1,22 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: jobcheck-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: jobcheck
+      POSTGRES_PASSWORD: jobcheck
+      POSTGRES_DB: jobcheck
+    ports:
+      - '5432:5432'
+    volumes:
+      - jobcheck-postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U jobcheck -d jobcheck']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+volumes:
+  jobcheck-postgres-data:

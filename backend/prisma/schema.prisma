@@ -1,0 +1,479 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  USER
+  COMPANY_EMPLOYEE
+  COMPANY_ADMIN
+  MODERATOR
+  ADMIN
+}
+
+enum UserStatus {
+  ACTIVE
+  SUSPENDED
+  DEACTIVATED
+}
+
+enum CompanyStatus {
+  ACTIVE
+  INACTIVE
+  DISSOLVED
+  UNKNOWN
+}
+
+enum VerificationStatus {
+  UNVERIFIED
+  PENDING
+  APPROVED
+  REJECTED
+  EXPIRED
+  REVOKED
+}
+
+enum VerificationType {
+  BUSINESS_LICENSE
+  LEGAL_ENTITY
+  COMPANY_OWNERSHIP
+  OTHER
+}
+
+enum CategoryType {
+  INDUSTRY
+  REVIEW_TOPIC
+  RECOMMEND
+  INTERNET
+  LIFE_SERVICE
+  AI
+  SMART_HARDWARE
+  OTHER
+}
+
+enum CategoryStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum ContentStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+enum RecommendationType {
+  COMPANY
+  REVIEW
+  CONTENT
+  AI_ENTRY
+}
+
+enum RecommendationStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum EmploymentStatus {
+  CURRENT
+  FORMER
+  CONTRACTOR
+  INTERN
+  UNKNOWN
+}
+
+enum ReviewStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum ReviewType {
+  INTERNSHIP
+  INTERVIEW
+  WORK
+}
+
+enum ExperienceType {
+  INTERN
+  FULL_TIME
+}
+
+enum CommentStatus {
+  PUBLISHED
+  PENDING
+  HIDDEN
+}
+
+enum AIMessageRole {
+  SYSTEM
+  USER
+  ASSISTANT
+  TOOL
+}
+
+enum AIMessageStatus {
+  PENDING
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+
+model User {
+  id              String     @id @default(uuid()) @db.Uuid
+  email           String?    @unique @db.VarChar(320)
+  phone           String?    @unique @db.VarChar(32)
+  passwordHash    String?    @map("password_hash") @db.VarChar(255)
+  nickname        String     @db.VarChar(80)
+  avatarUrl       String?    @map("avatar_url") @db.VarChar(2048)
+  role            UserRole   @default(USER)
+  status          UserStatus @default(ACTIVE)
+  emailVerifiedAt DateTime?  @map("email_verified_at") @db.Timestamptz(3)
+  phoneVerifiedAt DateTime?  @map("phone_verified_at") @db.Timestamptz(3)
+  lastLoginAt     DateTime?  @map("last_login_at") @db.Timestamptz(3)
+  createdAt       DateTime   @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt       DateTime   @updatedAt @map("updated_at") @db.Timestamptz(3)
+  deletedAt       DateTime?  @map("deleted_at") @db.Timestamptz(3)
+
+  reviews                Review[]
+  comments               Comment[]
+  likes                  Like[]
+  favorites              Favorite[]
+  requestedVerifications Verification[]   @relation("VerificationRequester")
+  reviewedVerifications  Verification[]   @relation("VerificationReviewer")
+  aiHistory              AIHistory[]
+  aiConversations        AIConversation[]
+
+  @@index([status, createdAt])
+  @@index([deletedAt])
+  @@map("users")
+}
+
+model Company {
+  id                      String             @id @default(uuid()) @db.Uuid
+  legalName               String             @map("legal_name") @db.VarChar(200)
+  displayName             String             @map("display_name") @db.VarChar(120)
+  shortName               String?            @map("short_name") @db.VarChar(80)
+  slug                    String             @unique @db.VarChar(160)
+  logoUrl                 String?            @map("logo_url") @db.VarChar(2048)
+  unifiedSocialCreditCode String?            @unique @map("unified_social_credit_code") @db.VarChar(18)
+  legalRepresentative     String?            @map("legal_representative") @db.VarChar(100)
+  establishedAt           DateTime?          @map("established_at") @db.Date
+  registeredCapital       Decimal?           @map("registered_capital") @db.Decimal(18, 2)
+  registeredAddress       String?            @map("registered_address") @db.VarChar(500)
+  provinceCode            String?            @map("province_code") @db.VarChar(12)
+  cityCode                String?            @map("city_code") @db.VarChar(12)
+  districtCode            String?            @map("district_code") @db.VarChar(12)
+  companySizeCode         String?            @map("company_size_code") @db.VarChar(32)
+  financingStageCode      String?            @map("financing_stage_code") @db.VarChar(32)
+  businessStatus          CompanyStatus      @default(UNKNOWN) @map("business_status")
+  verificationStatus      VerificationStatus @default(UNVERIFIED) @map("verification_status")
+  description             String?            @db.Text
+  website                 String?            @db.VarChar(2048)
+  tags                    String[]           @default([])
+
+  // Cached aggregates. They must be updated in the same transaction as review state changes.
+  reviewCount            Int       @default(0) @map("review_count")
+  ratingAverage          Decimal   @default(0) @map("rating_average") @db.Decimal(3, 2)
+  workScoreAverage       Decimal   @default(0) @map("work_score_average") @db.Decimal(3, 2)
+  managementScoreAverage Decimal   @default(0) @map("management_score_average") @db.Decimal(3, 2)
+  benefitsScoreAverage   Decimal   @default(0) @map("benefits_score_average") @db.Decimal(3, 2)
+  growthScoreAverage     Decimal   @default(0) @map("growth_score_average") @db.Decimal(3, 2)
+  ratingUpdatedAt        DateTime? @map("rating_updated_at") @db.Timestamptz(3)
+
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz(3)
+
+  categories    CompanyCategory[]
+  reviews       Review[]
+  favorites     Favorite[]
+  verifications Verification[]
+
+  @@index([displayName])
+  @@index([businessStatus, deletedAt])
+  @@index([verificationStatus, deletedAt])
+  @@index([provinceCode, cityCode, districtCode])
+  @@index([ratingAverage])
+  @@map("companies")
+}
+
+model Category {
+  id          String         @id @default(uuid()) @db.Uuid
+  type        CategoryType
+  code        String         @db.VarChar(64)
+  name        String         @db.VarChar(100)
+  description String?        @db.VarChar(500)
+  icon        String?        @db.VarChar(100)
+  parentId    String?        @map("parent_id") @db.Uuid
+  level       Int            @default(1) @db.SmallInt
+  sort        Int            @default(0) @map("sort_order")
+  status      CategoryStatus @default(ACTIVE)
+  isActive    Boolean        @default(true) @map("is_active")
+  createdAt   DateTime       @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt   DateTime       @updatedAt @map("updated_at") @db.Timestamptz(3)
+  deletedAt   DateTime?      @map("deleted_at") @db.Timestamptz(3)
+
+  parent    Category?         @relation("CategoryTree", fields: [parentId], references: [id], onDelete: Restrict)
+  children  Category[]        @relation("CategoryTree")
+  companies CompanyCategory[]
+  reviews   Review[]
+  contents  Content[]
+
+  @@unique([type, code])
+  @@index([parentId, sort])
+  @@index([type, status, sort])
+  @@index([deletedAt])
+  @@map("categories")
+}
+
+model Content {
+  id          String        @id @default(uuid()) @db.Uuid
+  categoryId  String        @map("category_id") @db.Uuid
+  title       String        @db.VarChar(200)
+  description String?       @db.VarChar(1000)
+  cover       String?       @db.VarChar(2048)
+  url         String        @db.VarChar(2048)
+  source      String?       @db.VarChar(120)
+  viewCount   Int           @default(0) @map("view_count")
+  status      ContentStatus @default(PUBLISHED)
+  createdAt   DateTime      @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt   DateTime      @updatedAt @map("updated_at") @db.Timestamptz(3)
+  deletedAt   DateTime?     @map("deleted_at") @db.Timestamptz(3)
+
+  category Category @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+
+  @@index([categoryId, status, createdAt])
+  @@index([status, viewCount])
+  @@index([deletedAt])
+  @@map("contents")
+}
+
+model Recommendation {
+  id          String               @id @default(uuid()) @db.Uuid
+  type        RecommendationType
+  targetId    String?              @map("target_id") @db.Uuid
+  title       String?              @db.VarChar(200)
+  description String?              @db.VarChar(500)
+  icon        String?              @db.VarChar(100)
+  url         String?              @db.VarChar(2048)
+  sort        Int                  @default(0)
+  status      RecommendationStatus @default(ACTIVE)
+  createdAt   DateTime             @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt   DateTime             @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  @@index([type, status, sort])
+  @@index([targetId])
+  @@map("recommendations")
+}
+
+model CompanyCategory {
+  companyId  String   @map("company_id") @db.Uuid
+  categoryId String   @map("category_id") @db.Uuid
+  isPrimary  Boolean  @default(false) @map("is_primary")
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt  DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  company  Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  category Category @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+
+  @@id([companyId, categoryId])
+  @@index([categoryId, companyId])
+  @@map("company_categories")
+}
+
+model Review {
+  id                   String           @id @default(uuid()) @db.Uuid
+  companyId            String           @map("company_id") @db.Uuid
+  userId               String           @map("user_id") @db.Uuid
+  categoryId           String?          @map("category_id") @db.Uuid
+  title                String           @db.VarChar(160)
+  reviewType           ReviewType       @default(WORK) @map("review_type")
+  experienceType       ExperienceType   @default(FULL_TIME) @map("experience_type")
+  content              String           @db.Text
+  advantage            String?          @db.Text
+  disadvantage         String?          @db.Text
+  salary               Int?
+  salaryInfo           String?          @map("salary_info") @db.VarChar(500)
+  interviewDifficulty  Int?             @map("interview_difficulty") @db.SmallInt
+  workExperience       String?          @map("work_experience") @db.VarChar(1000)
+  department           String?          @db.VarChar(100)
+  position             String?          @db.VarChar(100)
+  employmentStatus     EmploymentStatus @default(UNKNOWN) @map("employment_status")
+  isAnonymous          Boolean          @default(true) @map("is_anonymous")
+  isVerifiedEmployee   Boolean          @default(false) @map("is_verified_employee")
+  employeeVerifiedAt   DateTime?        @map("employee_verified_at") @db.Timestamptz(3)
+  rating               Decimal          @db.Decimal(3, 2)
+  workEnvironmentScore Int              @map("work_environment_score") @db.SmallInt
+  managementScore      Int              @map("management_score") @db.SmallInt
+  salaryBenefitScore   Int              @map("salary_benefit_score") @db.SmallInt
+  growthScore          Int              @map("growth_score") @db.SmallInt
+  status               ReviewStatus     @default(PENDING)
+  likeCount            Int              @default(0) @map("like_count")
+  commentCount         Int              @default(0) @map("comment_count")
+  favoriteCount        Int              @default(0) @map("favorite_count")
+  publishedAt          DateTime?        @map("published_at") @db.Timestamptz(3)
+  createdAt            DateTime         @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt            DateTime         @updatedAt @map("updated_at") @db.Timestamptz(3)
+  deletedAt            DateTime?        @map("deleted_at") @db.Timestamptz(3)
+
+  company   Company    @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  author    User       @relation(fields: [userId], references: [id], onDelete: Restrict)
+  category  Category?  @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  comments  Comment[]
+  likes     Like[]
+  favorites Favorite[]
+
+  @@index([companyId, status, publishedAt])
+  @@index([companyId, reviewType, status])
+  @@index([userId, createdAt])
+  @@index([categoryId, status, publishedAt])
+  @@index([status, publishedAt])
+  @@index([rating])
+  @@index([deletedAt])
+  @@map("reviews")
+}
+
+model Comment {
+  id         String        @id @default(uuid()) @db.Uuid
+  reviewId   String        @map("review_id") @db.Uuid
+  userId     String        @map("user_id") @db.Uuid
+  parentId   String?       @map("parent_id") @db.Uuid
+  content    String        @db.Text
+  status     CommentStatus @default(PUBLISHED)
+  likeCount  Int           @default(0) @map("like_count")
+  replyCount Int           @default(0) @map("reply_count")
+  createdAt  DateTime      @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt  DateTime      @updatedAt @map("updated_at") @db.Timestamptz(3)
+  deletedAt  DateTime?     @map("deleted_at") @db.Timestamptz(3)
+
+  review  Review    @relation(fields: [reviewId], references: [id], onDelete: Cascade)
+  author  User      @relation(fields: [userId], references: [id], onDelete: Restrict)
+  parent  Comment?  @relation("CommentReplies", fields: [parentId], references: [id], onDelete: SetNull)
+  replies Comment[] @relation("CommentReplies")
+  likes   Like[]
+
+  @@index([reviewId, parentId, status, createdAt])
+  @@index([userId, createdAt])
+  @@index([parentId])
+  @@index([deletedAt])
+  @@map("comments")
+}
+
+model Like {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  reviewId  String?  @map("review_id") @db.Uuid
+  commentId String?  @map("comment_id") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  user    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  review  Review?  @relation(fields: [reviewId], references: [id], onDelete: Cascade)
+  comment Comment? @relation(fields: [commentId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, reviewId])
+  @@unique([userId, commentId])
+  @@index([reviewId, createdAt])
+  @@index([commentId, createdAt])
+  @@index([userId, createdAt])
+  @@map("likes")
+}
+
+model Favorite {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  companyId String?  @map("company_id") @db.Uuid
+  reviewId  String?  @map("review_id") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  user    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  company Company? @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  review  Review?  @relation(fields: [reviewId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, companyId])
+  @@unique([userId, reviewId])
+  @@index([companyId, createdAt])
+  @@index([reviewId, createdAt])
+  @@index([userId, createdAt])
+  @@map("favorites")
+}
+
+model Verification {
+  id              String             @id @default(uuid()) @db.Uuid
+  companyId       String             @map("company_id") @db.Uuid
+  requestedById   String?            @map("requested_by_id") @db.Uuid
+  reviewedById    String?            @map("reviewed_by_id") @db.Uuid
+  type            VerificationType
+  status          VerificationStatus @default(PENDING)
+  source          String?            @db.VarChar(100)
+  externalRef     String?            @map("external_ref") @db.VarChar(160)
+  evidenceUrl     String?            @map("evidence_url") @db.VarChar(2048)
+  evidenceMeta    Json?              @map("evidence_meta") @db.JsonB
+  rejectionReason String?            @map("rejection_reason") @db.VarChar(500)
+  submittedAt     DateTime           @default(now()) @map("submitted_at") @db.Timestamptz(3)
+  verifiedAt      DateTime?          @map("verified_at") @db.Timestamptz(3)
+  expiresAt       DateTime?          @map("expires_at") @db.Timestamptz(3)
+  createdAt       DateTime           @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt       DateTime           @updatedAt @map("updated_at") @db.Timestamptz(3)
+  deletedAt       DateTime?          @map("deleted_at") @db.Timestamptz(3)
+
+  company     Company @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  requestedBy User?   @relation("VerificationRequester", fields: [requestedById], references: [id], onDelete: SetNull)
+  reviewedBy  User?   @relation("VerificationReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
+
+  @@index([companyId, status, createdAt])
+  @@index([status, expiresAt])
+  @@index([requestedById, createdAt])
+  @@index([reviewedById, createdAt])
+  @@index([deletedAt])
+  @@map("verifications")
+}
+
+model AIHistory {
+  id               String          @id @default(uuid()) @db.Uuid
+  userId           String          @map("user_id") @db.Uuid
+  conversationId   String          @map("conversation_id") @db.Uuid
+  sequence         Int
+  role             AIMessageRole
+  content          String          @db.Text
+  model            String?         @db.VarChar(100)
+  status           AIMessageStatus @default(COMPLETED)
+  promptTokens     Int?            @map("prompt_tokens")
+  completionTokens Int?            @map("completion_tokens")
+  context          Json?           @db.JsonB
+  citations        Json?           @db.JsonB
+  errorCode        String?         @map("error_code") @db.VarChar(100)
+  createdAt        DateTime        @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt        DateTime        @updatedAt @map("updated_at") @db.Timestamptz(3)
+  deletedAt        DateTime?       @map("deleted_at") @db.Timestamptz(3)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([conversationId, sequence])
+  @@index([userId, conversationId, createdAt])
+  @@index([userId, deletedAt, updatedAt])
+  @@index([status, createdAt])
+  @@map("ai_history")
+}
+
+model AIConversation {
+  id             String   @id @default(uuid()) @db.Uuid
+  conversationId String   @map("conversation_id") @db.Uuid
+  userId         String   @map("user_id") @db.Uuid
+  question       String   @db.Text
+  answer         String   @db.Text
+  model          String   @db.VarChar(100)
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, conversationId, createdAt])
+  @@index([userId, createdAt])
+  @@map("ai_conversations")
+}
